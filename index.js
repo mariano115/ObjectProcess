@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 const { getMensajes, addMensaje } = require("./Mensajes");
 const { createUser } = require("./Users");
-const { fakerProducts, auth, createHash } = require("./utils");
+const { fakerProducts, auth, createHash, generarNumeros, verificar } = require("./utils");
 const { Server: HttpServer } = require("http");
 const { Server: IOServer } = require("socket.io");
 const app = express();
@@ -15,6 +15,7 @@ const cookieParser = require("cookie-parser");
 const userModel = require("./models/User.model");
 const MongoStore = require("connect-mongo");
 const { isValidPassword } = require("./utils");
+const parseArgs = require("minimist");
 
 //passport imports
 const passport = require("passport");
@@ -71,7 +72,9 @@ io.on("connection", async (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
+//Puerto enviado por ARGS
+const args = parseArgs(process.argv.slice(2));
+const PORT = args._[0] || 8080;
 
 mongoose.connect(
   Config.urlMongo,
@@ -91,8 +94,8 @@ app.use(passport.session());
 passport.use(
   "login",
   new LocalStrategy(
-    { usernameField: 'email', passwordField: 'password' },
-    ( email, password, done) => {
+    { usernameField: "email", passwordField: "password" },
+    (email, password, done) => {
       mongoose.connect(Config.urlMongo);
       try {
         userModel.findOne(
@@ -100,7 +103,7 @@ passport.use(
             email,
           },
           (err, user) => {
-            console.log(user)
+            console.log(user);
             if (err) {
               return done(err, null);
             }
@@ -139,11 +142,13 @@ app.get("/", auth, (req, res) => {
   res.redirect("/home");
 });
 
-app.post("/login",
+app.post(
+  "/login",
   passport.authenticate("login", {
-    failureRedirect: "/login-error"
-  }), (req, res) => {
-    console.log('home')
+    failureRedirect: "/login-error",
+  }),
+  (req, res) => {
+    console.log("home");
     req.session.email = req.body.email;
     res.redirect("/home");
   }
@@ -159,13 +164,13 @@ app.get("/register", (req, res) => {
 
 app.post("/register", (req, res) => {
   try {
-    const hashPassword = createHash(req.body.password)
-    const newUser = { email: req.body.email, password: hashPassword }
-      if (createUser(newUser)) {
-        res.redirect("/");
-      } else {
-        res.render("register-error");
-      }
+    const hashPassword = createHash(req.body.password);
+    const newUser = { email: req.body.email, password: hashPassword };
+    if (createUser(newUser)) {
+      res.redirect("/");
+    } else {
+      res.render("register-error");
+    }
   } catch (error) {
     res.render("register-error");
   }
@@ -196,4 +201,26 @@ app.get("/productos-test", async (req, res) => {
   res.send(fakerProducts(5));
 });
 
-httpServer.listen(PORT, () => console.log("servidor Levantado"));
+app.get("/info", async (req, res) => {
+  const infoData = {
+    arguments: parseArgs(process.argv.slice(2)),
+    plataform: process.platform,
+    nodeVersion: process.version,
+    rss: process.memoryUsage().rss,
+    execPath: process.execPath, 
+    IdProcess: process.pid,
+    proyectFolder: process.cwd(),
+  };
+  res.render("info", { infoData });
+});
+
+app.get("/api/randoms", async (req, res) => {
+  const cantNumbers = req.query.cant || 100000000;
+  const generatedNumbers = generarNumeros(cantNumbers)
+  verificar(generatedNumbers)
+});
+
+
+httpServer.listen(PORT, () =>
+  console.log("servidor Levantado en el puerto " + PORT)
+);
