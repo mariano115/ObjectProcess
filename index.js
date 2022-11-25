@@ -3,7 +3,11 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 const { getMensajes, addMensaje } = require("./Mensajes");
 const { createUser } = require("./Users");
-const { fakerProducts, auth, createHash, generarNumeros, verificar } = require("./utils");
+const {
+  fakerProducts,
+  auth,
+  createHash
+} = require("./utils");
 const { Server: HttpServer } = require("http");
 const { Server: IOServer } = require("socket.io");
 const app = express();
@@ -16,6 +20,7 @@ const userModel = require("./models/User.model");
 const MongoStore = require("connect-mongo");
 const { isValidPassword } = require("./utils");
 const parseArgs = require("minimist");
+const { fork } = require("child_process");
 
 //passport imports
 const passport = require("passport");
@@ -207,7 +212,7 @@ app.get("/info", async (req, res) => {
     plataform: process.platform,
     nodeVersion: process.version,
     rss: process.memoryUsage().rss,
-    execPath: process.execPath, 
+    execPath: process.execPath,
     IdProcess: process.pid,
     proyectFolder: process.cwd(),
   };
@@ -215,9 +220,14 @@ app.get("/info", async (req, res) => {
 });
 
 app.get("/api/randoms", async (req, res) => {
+  const forked = fork("randoms.js");
+
+  forked.on("message", (message) => {
+    res.json(message);
+  });
+
   const cantNumbers = req.query.cant || 100000000;
-  const generatedNumbers = generarNumeros(cantNumbers)
-  verificar(generatedNumbers)
+  forked.send({cant: parseInt(cantNumbers)})
 });
 
 
